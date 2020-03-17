@@ -19,6 +19,8 @@ public class TaskletSampleJobConfig {
 	@Autowired
 	private Tasklet2 tasklet2;
 	@Autowired
+	private ReserveMailMain fmMail;
+	@Autowired
 	private JobBuilderFactory jobBuilderFactory;
 	@Autowired
 	private StepBuilderFactory stepBuilderFactory;
@@ -37,14 +39,22 @@ public class TaskletSampleJobConfig {
 				.tasklet(tasklet2)
 				.build();
 	}
+	
+	@Bean
+	public Step step3() {
+		return stepBuilderFactory.get("step3")
+				.tasklet(fmMail)
+				.build();
+	}
 
 	@Bean
-	public Job job(Step step1, Step step2) throws Exception {
+	public Job job(Step step1, Step step2, Step step3) throws Exception {
 		return jobBuilderFactory.get("job")
 				.incrementer(new RunIdIncrementer())
 				.listener(listener())
 				.start(step1)
 				.next(step2)
+				.next(step3)
 				.build();
 	}
 
