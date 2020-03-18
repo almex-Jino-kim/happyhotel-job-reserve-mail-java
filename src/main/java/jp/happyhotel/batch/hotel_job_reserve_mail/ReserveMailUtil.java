@@ -1,10 +1,12 @@
 package jp.happyhotel.batch.hotel_job_reserve_mail;
 
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.parsing.ParseState;
 
 import jp.happyhotel.batch.hotel_job_reserve_mail.bean.SysInfoBean;
 import jp.happyhotel.batch.hotel_job_reserve_mail.bean.MailHotelBean;
@@ -46,43 +48,19 @@ public class ReserveMailUtil  {
     public static String eMailHeader[] = new String[MAIL_KIND_CNT];
     public static String eMailBody[] = new String[MAIL_KIND_CNT];
     
-   
-
-    
-    // TODO セッティングを読む
-    public static int readSetting(
-    		SysInfoBean sysInfo, 
-    		String mailHeader[], 
-    		String mailBody[], 
-    		String mailHeaderError[], 
-    		String mailBodyError[]
-    		) {
-    	
-    	String strKey;
-    	String strFile;
-    	int ix;
-    	int n;
-    	int readSetting = 0;
-    	
-    	
-    	
-    	// テキストファイルの文字コード(ここでは、Shift JIS)
-    	
-    	
-    	return readSetting;
-    }
-    
+    /*
+     *  メールメッセージに埋め込む
+     */
     private String makeMailBody (
-    		/*OdbcDataReader reader*/
+    		/* TODO OdbcDataReader reader → 実装を変える*/
     		String msgBody,
     		UserInfoBean userinfo
     		) {
     	String strKey;
     	String strVal = "";
     	
-    	// 埋め込み用のキー（データベースの項目名）
     	/**
-    	 *　メールメッセージに埋め込む
+    	 *　 埋め込み用のキー（データベースの項目名）
     	 *
     	 *	accept_date	        受付日	            YYYY年MM月DD日
     	 *	accept_time	        受付時刻	        HH:mm
@@ -148,22 +126,19 @@ public class ReserveMailUtil  {
     	strKeyArray.add("user_tel");
     	strKeyArray.add("parking");
     	
-    	for (int i = 0 ; i < strKeyArray.size(); i++) {
+    	for (int i = 0 ; i < strKeyArray.size() - 1 ; i++) {
     		strKey = strKeyArray.get(i);
     		
     		try {
 				// TODO strVal = reader(strKey).toString();
 			} catch (Exception e) {
-				// TODO: handle exception
 				strVal = "";
 			}
     		
     		switch(strKey) {
     		case "reserve_no":
-    			int size = strVal.length();
-    			int cut_length = 6;
-    			
-    			strVal = strVal.substring(size - cut_length);
+    			// 元ソース： strVal = Strings.Right(strVal, 6)
+    			strVal = strVal.substring(strVal.length() - 6);
     			
     			// TODO  OTAからの予約の場合OTAでの予約番号も追記する
     			if (reader("ext_flag") == 2) {
@@ -206,7 +181,28 @@ public class ReserveMailUtil  {
             		 }
             	}
             case "charge":  // 料金明細を作成する
-            	// TODO つづきの実装
+            	int charge = reader("basic_charge_total");
+            	int num_adult = reader("num_adult");
+            	int num_child = reader("num_child");
+            	int spaceCnt = getSpaceCount(msgBody, strKey);
+            	
+            	strVal = "";
+            	
+            	if (num_adult == 1) {
+            		// 元ソース： strVal = charge.ToString("#,##0") & "円（大人１人"
+            		strVal = String.valueOf(charge)
+            		
+            	} else if (num_adult >= 2) {
+            		// 元ソース： strVal = charge.ToString("#,##0") & "円（大人２人"
+            		
+            		if (num_adult > 2) {
+            			// 元ソース：strVal &= "、大人追加 × " & (num_adult - 2).ToString & "名"
+            		}
+            		
+            	}
+            	
+            	break;
+            	
     		}
     		
     	}
@@ -215,5 +211,107 @@ public class ReserveMailUtil  {
     	return msgBody;
     }
 
+    /*
+     * TODO セッティングを読む
+     */
+    public static int readSetting(
+    		SysInfoBean sysInfo, 
+    		String mailHeader[], 
+    		String mailBody[], 
+    		String mailHeaderError[], 
+    		String mailBodyError[]
+    		) {
+    	
+    	String strKey;
+    	String strFile;
+    	int ix;
+    	int n;
+    	int readSetting = 0;
+    	
+    	// テキストファイルの文字コード(ここでは、Shift JIS)
+    	
+    	
+    	return readSetting;
+    }
+    
+    /*
+     * 時間を文字列に変換する
+     */
+    private String timeConv(String strTime) {
+    	String strWork = "";
+    	// 元ソース：strTime = strTime.PadLeft(6, "0")
+    	// ゼロ埋め:PadLeft(桁数, 文字)で指定した桁数を指定した文字で文字列を埋める
+    	 strTime = strTime.format("%6s", strTime).replace(" ", "0");
+    	
+    	switch (strTime.length()) {
+        case 6:
+        	// 元ソース：strWork = Left(strTime, 2) & ":" & Mid(strTime, 3, 2);
+        	strWork = strTime.substring(0, 2) + ":" + strTime.substring(2, 4);
+            break;
+        case 5:
+        	// 元ソース：strWork = Left(strTime, 1) & ":" & Mid(strTime, 2, 2)
+        	strWork = strTime.substring(0, 1) + ":" + strTime.substring(1, 3);
+    		break;
+        default:
+            strWork = strTime;
+    	}
+    	return strWork;
+	}
+
+	/*
+     * 日付けを文字列に変換する
+     */
+    private String dateConv(String strDate) {
+    	String strWork;
+    	// strWork = Left(strDate, 4) & "/" & Mid(strDate, 5, 2) & "/" & Right(strDate, 2)
+    	// 例：20200318
+    	strWork = strDate.substring(0, 4) + "/" + strDate.substring(4, 6) + "/" + strDate.substring(strDate.length() - 2);
+		return strWork;
+	}
+
+	/*
+     * 行頭のスペースをカウントする
+     */
+	private int getSpaceCount(String msgBody, String strKey) {
+		// TODO Auto-generated method stub
+		int index;
+		int count;
+		
+		index = msgBody.indexOf("%" + strKey + "%");
+		if (index < 0) {		// キーが見つからない
+			return 0;
+		} 
+		// 元ソース： count = msgBody.LastIndexOf(vbCrLf, index)
+		count = msgBody.lastIndexOf("\n", index);
+		
+		if (count > 0){
+			// 元ソース：count = LenB(Mid(msgBody, count + 2, index - count - 2))
+			count = lenByte(msgBody.substring(count + 2, index - count - 2));			
+		} else {
+			// 元ソース：count = LenB(Left(msgBody, index))
+			count = lenByte(msgBody.substring(0, index));
+		}
+		
+		return count;
+	}
+
+	/*
+	 * 文字列のバイト数（半角1バイト、全角2バイト）
+	 */
+	private int lenByte (String strText) {
+		// 元ソース： Return System.Text.Encoding.GetEncoding("Shift_JIS").GetByteCount(strText)
+		// 【参考】https://www.saka-en.com/java/java-string/
+		if ( strText == null || strText.length() == 0 ) {
+			return 0;			
+		}
+		
+	    int ret = 0;
+		try {
+			ret = strText.getBytes("Shift_JIS").length;
+		} catch (UnsupportedEncodingException e) {
+			ret = 0;
+		}
+		return ret;
+	}
     
 }
